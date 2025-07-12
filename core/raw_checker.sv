@@ -24,11 +24,14 @@ module raw_checker
     input logic [CVA6Cfg.NR_SB_ENTRIES-1:0][REG_ADDR_SIZE-1:0] rd_i,
     // Type of registers of destination (FPR or GPR) - SCOREBOARD
     input logic [CVA6Cfg.NR_SB_ENTRIES-1:0] rd_fpr_i,
+    // Position of LD instructions if RVZilsd is active
+    input logic [CVA6Cfg.NR_SB_ENTRIES-1:0] rd_zilsd_i,
     // Instructions in the scoreboard are still issued - SCOREBOARD
     input logic [CVA6Cfg.NR_SB_ENTRIES-1:0] still_issued_i,
     // Issue pointer - SCOREBOARD
     input logic [CVA6Cfg.TRANS_ID_BITS-1:0] issue_pointer_i,
 
+    output logic is_zilsd_raw,
     // Index in the scoreboard of the most recent RAW dependancy - SCOREBOARD
     output logic [CVA6Cfg.TRANS_ID_BITS-1:0] idx_o,
     // Indicates if there is a RAW dependancy - SCOREBOARD
@@ -46,7 +49,7 @@ module raw_checker
   logic                             rs_is_gpr0;
 
   for (genvar i = 0; i < CVA6Cfg.NR_SB_ENTRIES; i++) begin
-    assign same_rd_as_rs[i] = (rs_fpr_i == rd_fpr_i[i]) && (rs_i == rd_i[i]) && still_issued_i[i];
+    assign same_rd_as_rs[i] = ((rs_fpr_i == rd_fpr_i[i]) && (rs_i == rd_i[i]) && still_issued_i[i]) || (rd_zilsd_i[i] && (rs_i == {rd_i[i][REG_ADDR_SIZE-1:1],1'b1}) && (rs_fpr_i == rd_fpr_i[i]) && still_issued_i[i]);
     assign same_rd_as_rs_before[i] = (i < issue_pointer_i) && same_rd_as_rs[i];
     assign same_rd_as_rs_after[i] = (i >= issue_pointer_i) && same_rd_as_rs[i];
   end
@@ -66,6 +69,7 @@ module raw_checker
   end
 
   assign idx_o = |same_rd_as_rs_before ? last_before_idx : last_after_idx;
+  assign is_zilsd_raw = (rd_zilsd_i[idx_o] && (rs_i == {rd_i[idx_o][REG_ADDR_SIZE-1:1],1'b1}) && !rs_fpr_i);
 
   assign rs_is_gpr0 = (rs_i == '0) && !rs_fpr_i;
   assign valid_o = |same_rd_as_rs && !rs_is_gpr0;

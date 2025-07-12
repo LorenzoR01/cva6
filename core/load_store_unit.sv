@@ -838,6 +838,9 @@ module load_store_unit
   // LSU Control
   // ------------------
   // new data arrives here
+  logic [CVA6Cfg.XLEN+32*CVA6Cfg.RVZilsd-1:0] lsu_data;
+  assign lsu_data = (CVA6Cfg.RVZilsd) ? {fu_data_i.operand_c,fu_data_i.operand_b} : fu_data_i.operand_b;
+
   lsu_ctrl_t lsu_req_i;
 
   assign lsu_req_i = {
@@ -848,7 +851,7 @@ module load_store_unit
     hlvx_inst,
     overflow,
     g_overflow,
-    {fu_data_i.operand_c,fu_data_i.operand_b},
+    lsu_data,
     be_i,
     fu_data_i.fu,
     fu_data_i.operation,

@@ -174,7 +174,6 @@ module decoder
     instruction_o.rs1                      = '0;
     instruction_o.rs2                      = '0;
     instruction_o.rd                       = '0;
-    instruction_o.result                   = '0;
     instruction_o.use_pc                   = 1'b0;
     instruction_o.is_compressed            = is_compressed_i;
     instruction_o.is_macro_instr           = is_macro_instr_i;
@@ -1708,6 +1707,7 @@ module decoder
 
     // NOIMM, IIMM, SIMM, SBIMM, UIMM, JIMM, RS3
     // select immediate
+    instruction_o.result = '0;
     case (imm_select)
       IIMM: begin
         instruction_o.result  = imm_i_type;
@@ -1715,7 +1715,7 @@ module decoder
       end
       SIMM: begin
         if (CVA6Cfg.RVZilsd && instruction_o.op == ariane_pkg::SD) begin
-          instruction_o.result = {imm_s_type,{32 - 5{1'b0}},instruction_o.rs2[REG_ADDR_SIZE-1:1],1'b1};
+          instruction_o.result = {imm_s_type,{32 - 5{1'b0}},instruction_o.rs2[REG_ADDR_SIZE-1:1],1'b1 && |instruction_o.rs2};
         end else begin
           instruction_o.result[CVA6Cfg.XLEN-1:0] = imm_s_type;
         end

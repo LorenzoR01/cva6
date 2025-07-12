@@ -47,7 +47,7 @@ module commit_stage
     // Register file write data - ISSUE_STAGE
     output logic [CVA6Cfg.NrCommitPorts+CVA6Cfg.RVZilsd-1:0][CVA6Cfg.XLEN-1:0] wdata_o,
     // Register file write enable - ISSUE_STAGE
-    output logic [CVA6Cfg.NrCommitPorts+CVA6Cfg:RVZilsd-1:0] we_gpr_o,
+    output logic [CVA6Cfg.NrCommitPorts+CVA6Cfg.RVZilsd-1:0] we_gpr_o,
     // Floating point register enable - ISSUE_STAGE
     output logic [CVA6Cfg.NrCommitPorts-1:0] we_fpr_o,
     // Result of AMO operation - CACHE
@@ -191,17 +191,17 @@ module commit_stage
         end
         if (CVA6Cfg.RVZilsd) begin
           if (commit_instr_i[0].op == ariane_pkg::LD && commit_ack_o[0]) begin
-            wdata_o[2] = commit_instr_i[0].result[63:32]; 
-            waddr_o[2] = {commit_instr_i[0].rd[REG_ADDR_SIZE-1:1],1'b1};
+            wdata_o[CVA6Cfg.NrCommitPorts] = commit_instr_i[0].result[CVA6Cfg.XLEN-1+32*CVA6Cfg.RVZilsd:32*CVA6Cfg.RVZilsd]; 
+            waddr_o[CVA6Cfg.NrCommitPorts] = {commit_instr_i[0].rd[REG_ADDR_SIZE-1:1],1'b1};
             if (!commit_drop_i[0]) begin
-              we_gpr_o[2] = 1'b1;
+              we_gpr_o[CVA6Cfg.NrCommitPorts] = (1'b1 && |commit_instr_i[0].rd);
             end else begin
-              we_gpr_o[2] = 1'b0;
+              we_gpr_o[CVA6Cfg.NrCommitPorts] = 1'b0;
             end
           end else begin
-            wdata_o[2] = '0;
-            waddr_o[2] = '0;
-            we_gpr_o[2] = 1'b0;
+            wdata_o[CVA6Cfg.NrCommitPorts] = '0;
+            waddr_o[CVA6Cfg.NrCommitPorts] = '0;
+            we_gpr_o[CVA6Cfg.NrCommitPorts] = 1'b0;
           end
         end
 
@@ -225,7 +225,7 @@ module commit_stage
         if (commit_instr_i[0].fu == CSR) begin
           // write the CSR file
           csr_op_o    = commit_instr_i[0].op;
-          csr_wdata_o = commit_instr_i[0].result;
+          csr_wdata_o = commit_instr_i[0].result[CVA6Cfg.XLEN-1:0];
           if (!commit_drop_i[0]) begin
             if (!csr_exception_i.valid) begin
               commit_csr_o = 1'b1;
@@ -358,10 +358,10 @@ module commit_stage
                 waddr_o[2] = '0;
                 we_gpr_o[2:1] = 2'b00;
               end else begin
-                wdata_o[2] = commit_instr_i[1].result[63:32]; 
+                wdata_o[2] = commit_instr_i[1].result[CVA6Cfg.XLEN-1+32*CVA6Cfg.RVZilsd:32*CVA6Cfg.RVZilsd]; 
                 waddr_o[2] = {commit_instr_i[1].rd[REG_ADDR_SIZE-1:1],1'b1};
                 if (!commit_drop_i[1]) begin
-                  we_gpr_o[2] = 1'b1;
+                  we_gpr_o[2] = (1'b1 && |commit_instr_i[1].rd);
                 end else begin
                   we_gpr_o[2] = 1'b0;
                 end

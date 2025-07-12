@@ -188,9 +188,13 @@ module issue_read_operands
 
   logic [CVA6Cfg.NR_SB_ENTRIES-1:0][ariane_pkg::REG_ADDR_SIZE-1:0] rd_list;
   logic [CVA6Cfg.NR_SB_ENTRIES-1:0]                                rd_fpr;
+  logic [CVA6Cfg.NR_SB_ENTRIES-1:0]                                rd_zilsd;
+  logic [ CVA6Cfg.NrIssuePorts-1:0]                                rs1_zilsd_raw;
+  logic [ CVA6Cfg.NrIssuePorts-1:0]                                rs2_zilsd_raw;  
+  logic [ CVA6Cfg.NrIssuePorts-1:0]                                rs3_zilsd_raw;
 
   //fwd logic
-  logic [CVA6Cfg.NR_SB_ENTRIES-1:0][             CVA6Cfg.XLEN-1:0] fwd_res;
+  logic [CVA6Cfg.NR_SB_ENTRIES-1:0][CVA6Cfg.XLEN+32*CVA6Cfg.RVZilsd-1:0] fwd_res;
   logic [CVA6Cfg.NR_SB_ENTRIES-1:0]                                fwd_res_valid;
 
   logic [CVA6Cfg.NR_SB_ENTRIES-1:0]                                rs1_is_not_csr;
@@ -435,6 +439,7 @@ module issue_read_operands
   for (genvar i = 0; i < CVA6Cfg.NR_SB_ENTRIES; i++) begin
     assign rd_list[i] = fwd_i.sbe[i].rd;
     assign rd_fpr[i]  = CVA6Cfg.FpPresent && ariane_pkg::is_rd_fpr(fwd_i.sbe[i].op);
+    assign rd_zilsd[i] = CVA6Cfg.RVZilsd && (fwd_i.sbe[i].op == ariane_pkg::LD);
   end
 
   for (genvar i = 0; i < CVA6Cfg.NrIssuePorts; i++) begin : gen_raw_checks
@@ -447,6 +452,8 @@ module issue_read_operands
         .rs_fpr_i(rs1_fpr[i]),
         .rd_i(rd_list),
         .rd_fpr_i(rd_fpr),
+        .rd_zilsd_i(rd_zilsd),
+        .is_zilsd_raw(rs1_zilsd_raw),
         .still_issued_i(fwd_i.still_issued),
         .issue_pointer_i(fwd_i.issue_pointer),
         .idx_o(idx_hzd_rs1[i]),
@@ -463,6 +470,8 @@ module issue_read_operands
         .rs_fpr_i(rs2_fpr[i]),
         .rd_i(rd_list),
         .rd_fpr_i(rd_fpr),
+        .rd_zilsd_i(rd_zilsd),
+        .is_zilsd_raw(rs2_zilsd_raw),
         .still_issued_i(fwd_i.still_issued),
         .issue_pointer_i(fwd_i.issue_pointer),
         .idx_o(idx_hzd_rs2[i]),
@@ -479,6 +488,8 @@ module issue_read_operands
         .rs_fpr_i(rs3_fpr[i]),
         .rd_i(rd_list),
         .rd_fpr_i(rd_fpr),
+        .rd_zilsd_i(rd_zilsd),
+        .is_zilsd_raw(rs3_zilsd_raw),
         .still_issued_i(fwd_i.still_issued),
         .issue_pointer_i(fwd_i.issue_pointer),
         .idx_o(idx_hzd_rs3[i]),
@@ -504,15 +515,15 @@ module issue_read_operands
   end
 
   for (genvar i = 0; i < CVA6Cfg.NrIssuePorts; i++) begin
-    assign rs1_res[i] = fwd_res[idx_hzd_rs1[i]];
+    assign rs1_res[i] = rs1_zilsd_raw[i] ? fwd_res[idx_hzd_rs1[i]][63:32] : fwd_res[idx_hzd_rs1[i]][31:0];
     assign rs1_is_not_csr[i] = rs1_fpr[i] || (fwd_i.sbe[idx_hzd_rs1[i]].fu != ariane_pkg::CSR) || (CVA6Cfg.RVS && issue_instr_i[i].op == ariane_pkg::SFENCE_VMA);
     assign rs1_valid[i] = fwd_res_valid[idx_hzd_rs1[i]] && rs1_is_not_csr[i];
 
-    assign rs2_res[i] = fwd_res[idx_hzd_rs2[i]];
+    assign rs2_res[i] = rs2_zilsd_raw[i] ? fwd_res[idx_hzd_rs2[i]][63:32] : fwd_res[idx_hzd_rs2[i]][31:0];
     assign rs2_is_not_csr[i] = rs2_fpr[i] || (fwd_i.sbe[idx_hzd_rs2[i]].fu != ariane_pkg::CSR) || (CVA6Cfg.RVS && issue_instr_i[i].op == ariane_pkg::SFENCE_VMA);
     assign rs2_valid[i] = fwd_res_valid[idx_hzd_rs2[i]] && rs2_is_not_csr[i];
 
-    assign rs3[i] = fwd_res[idx_hzd_rs3[i]];
+    assign rs3[i] = rs3_zilsd_raw[i] ? fwd_res[idx_hzd_rs3[i]][63:32] : fwd_res[idx_hzd_rs3[i]][31:0];
     assign rs3_valid[i] = fwd_res_valid[idx_hzd_rs3[i]];
 
     if (CVA6Cfg.NrRgprPorts == 3) begin
@@ -628,20 +639,20 @@ module issue_read_operands
       // default is regfiles (gpr or fpr)
       fu_data_n[i].operand_a = operand_a_regfile[i];
       fu_data_n[i].operand_b = operand_b_regfile[i];
-
+      fu_data_n[i].operand_c = '0;
       // immediates are the third operands in the store case
       // for FP operations, the imm field can also be the third operand from the regfile
       if (OPERANDS_PER_INSTR == 3) begin
         fu_data_n[i].imm = (CVA6Cfg.FpPresent && is_imm_fpr(issue_instr_i[i].op)) ?
             {{CVA6Cfg.XLEN - CVA6Cfg.FLen{1'b0}}, operand_c_regfile[i]} :
-            issue_instr_i[i].op == OFFLOAD ? operand_c_regfile[i] : issue_instr_i[i].result;
+            issue_instr_i[i].op == OFFLOAD ? operand_c_regfile[i] : issue_instr_i[i].result[CVA6Cfg.XLEN-1:0];
       end else begin
         fu_data_n[i].imm = (CVA6Cfg.FpPresent && is_imm_fpr(issue_instr_i[i].op)) ?
-            {{CVA6Cfg.XLEN - CVA6Cfg.FLen{1'b0}}, operand_c_regfile[i]} : issue_instr_i[i].result;
+            {{CVA6Cfg.XLEN - CVA6Cfg.FLen{1'b0}}, operand_c_regfile[i]} : issue_instr_i[i].result[CVA6Cfg.XLEN-1:0];
       end
       if (CVA6Cfg.RVZilsd && issue_instr_i[i].op == ariane_pkg::SD) begin
         fu_data_n[i].operand_c = operand_c_regfile[i];
-        fu_data_n[i].imm = issue_instr_i[i].result[63:32];
+        fu_data_n[i].imm = issue_instr_i[i].result[CVA6Cfg.XLEN-1+32*CVA6Cfg.RVZilsd:32*CVA6Cfg.RVZilsd];
       end
       fu_data_n[i].trans_id  = issue_instr_i[i].trans_id;
       fu_data_n[i].fu        = issue_instr_i[i].fu;
@@ -662,7 +673,7 @@ module issue_read_operands
       end
       if (CVA6Cfg.RVZilsd && forward_rs3[i]) begin
         fu_data_n[i].operand_c = imm_forward_rs3;
-
+      end
       // use the PC as operand a
       if (issue_instr_i[i].use_pc) begin
         fu_data_n[i].operand_a = {
@@ -680,7 +691,7 @@ module issue_read_operands
       if (issue_instr_i[i].use_imm && (issue_instr_i[i].fu != STORE) && (issue_instr_i[i].fu != CTRL_FLOW) && (issue_instr_i[i].fu != ACCEL) && !(CVA6Cfg.FpPresent && is_rs2_fpr(
               issue_instr_i[i].op
           ))) begin
-        fu_data_n[i].operand_b = issue_instr_i[i].result;
+        fu_data_n[i].operand_b = issue_instr_i[i].result[CVA6Cfg.XLEN-1:0];
       end
     end
   end

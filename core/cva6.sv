@@ -122,7 +122,7 @@ module cva6
     },
     localparam type writeback_t = struct packed {
       logic valid;  // wb data is valid
-      logic [CVA6Cfg.XLEN-1:0] data;  //wb data
+      logic [CVA6Cfg.XLEN+32*CVA6Cfg.RVZilsd-1:0] data;  //wb data
       logic ex_valid;  // exception from WB
       logic [CVA6Cfg.TRANS_ID_BITS-1:0] trans_id;  //transaction ID
     },
@@ -455,11 +455,11 @@ module cva6
   logic lsu_ready_ex_id;
 
   logic [CVA6Cfg.TRANS_ID_BITS-1:0] load_trans_id_ex_id;
-  logic [CVA6Cfg.XLEN-1:0] load_result_ex_id;
+  logic [CVA6Cfg.XLEN+32*CVA6Cfg.RVZilsd-1:0] load_result_ex_id;
   logic load_valid_ex_id;
   exception_t load_exception_ex_id;
 
-  logic [CVA6Cfg.XLEN-1:0] store_result_ex_id;
+  logic [CVA6Cfg.XLEN+32*CVA6Cfg.RVZilsd-1:0] store_result_ex_id;
   logic [CVA6Cfg.TRANS_ID_BITS-1:0] store_trans_id_ex_id;
   logic store_valid_ex_id;
   exception_t store_exception_ex_id;
@@ -763,7 +763,7 @@ module cva6
   logic [CVA6Cfg.NrWbPorts-1:0] wt_valid_ex_id;
 
   assign trans_id_ex_id[FLU_WB] = flu_trans_id_ex_id;
-  assign wbdata_ex_id[FLU_WB]   = {CVA6Cfg.RVZilsd*32{1'b0},flu_result_ex_id};
+  assign wbdata_ex_id[FLU_WB]   = {{CVA6Cfg.RVZilsd*32{1'b0}},flu_result_ex_id};
   assign ex_ex_ex_id[FLU_WB]    = flu_exception_ex_id;
   assign wt_valid_ex_id[FLU_WB] = flu_valid_ex_id;
 
@@ -778,7 +778,7 @@ module cva6
   assign wt_valid_ex_id[LOAD_WB] = load_valid_ex_id;
 
   assign trans_id_ex_id[FPU_WB] = fpu_trans_id_ex_id;
-  assign wbdata_ex_id[FPU_WB]   = {CVA6Cfg.RVZilsd*32{1'b0},fpu_result_ex_id};
+  assign wbdata_ex_id[FPU_WB]   = {{CVA6Cfg.RVZilsd*32{1'b0}},fpu_result_ex_id};
   assign ex_ex_ex_id[FPU_WB]    = fpu_exception_ex_id;
   assign wt_valid_ex_id[FPU_WB] = fpu_valid_ex_id;
 
@@ -805,13 +805,13 @@ module cva6
       cvxif_req.result_ready     = x_result_ready;
     end
     assign trans_id_ex_id[X_WB] = x_trans_id_ex_id;
-    assign wbdata_ex_id[X_WB]   = {CVA6Cfg.RVZilsd*32{1'b0},x_result_ex_id};
+    assign wbdata_ex_id[X_WB]   = {{CVA6Cfg.RVZilsd*32{1'b0}},x_result_ex_id};
     assign ex_ex_ex_id[X_WB]    = x_exception_ex_id;
     assign wt_valid_ex_id[X_WB] = x_valid_ex_id;
   end else if (CVA6Cfg.EnableAccelerator) begin
     assign cvxif_req = '0;
     assign trans_id_ex_id[ACC_WB] = acc_trans_id_ex_id;
-    assign wbdata_ex_id[ACC_WB]   = {CVA6Cfg.RVZilsd*32{1'b0},acc_result_ex_id};
+    assign wbdata_ex_id[ACC_WB]   = {{CVA6Cfg.RVZilsd*32{1'b0}},acc_result_ex_id};
     assign ex_ex_ex_id[ACC_WB]    = acc_exception_ex_id;
     assign wt_valid_ex_id[ACC_WB] = acc_valid_ex_id;
   end else begin
