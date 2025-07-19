@@ -37,20 +37,20 @@ module ariane_regfile #(
     input  logic [        NR_READ_PORTS-1:0][           4:0] raddr_i,
     output logic [        NR_READ_PORTS-1:0][DATA_WIDTH-1:0] rdata_o,
     // write port
-    input  logic [CVA6Cfg.NrCommitPorts-1:0][           4:0] waddr_i,
-    input  logic [CVA6Cfg.NrCommitPorts-1:0][DATA_WIDTH-1:0] wdata_i,
-    input  logic [CVA6Cfg.NrCommitPorts-1:0]                 we_i
+    input  logic [CVA6Cfg.NrCommitPorts+CVA6Cfg.RVZilsd-1:0][           4:0] waddr_i,
+    input  logic [CVA6Cfg.NrCommitPorts+CVA6Cfg.RVZilsd-1:0][DATA_WIDTH-1:0] wdata_i,
+    input  logic [CVA6Cfg.NrCommitPorts+CVA6Cfg.RVZilsd-1:0]                 we_i
 );
 
   localparam ADDR_WIDTH = 5;
   localparam NUM_WORDS = 2 ** ADDR_WIDTH;
 
   logic [            NUM_WORDS-1:0][DATA_WIDTH-1:0] mem;
-  logic [CVA6Cfg.NrCommitPorts-1:0][ NUM_WORDS-1:0] we_dec;
+  logic [CVA6Cfg.NrCommitPorts+CVA6Cfg.RVZilsd-1:0][ NUM_WORDS-1:0] we_dec;
 
 
   always_comb begin : we_decoder
-    for (int unsigned j = 0; j < CVA6Cfg.NrCommitPorts; j++) begin
+    for (int unsigned j = 0; j < CVA6Cfg.NrCommitPorts+CVA6Cfg.RVZilsd; j++) begin
       for (int unsigned i = 0; i < NUM_WORDS; i++) begin
         if (waddr_i[j] == i) we_dec[j][i] = we_i[j];
         else we_dec[j][i] = 1'b0;
@@ -63,7 +63,7 @@ module ariane_regfile #(
     if (~rst_ni) begin
       mem <= '{default: '0};
     end else begin
-      for (int unsigned j = 0; j < CVA6Cfg.NrCommitPorts; j++) begin
+      for (int unsigned j = 0; j < CVA6Cfg.NrCommitPorts+CVA6Cfg.RVZilsd; j++) begin
         for (int unsigned i = 0; i < NUM_WORDS; i++) begin
           if (we_dec[j][i]) begin
             mem[i] <= wdata_i[j];

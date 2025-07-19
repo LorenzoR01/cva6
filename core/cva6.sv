@@ -539,9 +539,9 @@ module cva6
   // --------------
   // COMMIT <-> ID
   // --------------
-  logic [CVA6Cfg.NrCommitPorts-1:0][4:0] waddr_commit_id;
-  logic [CVA6Cfg.NrCommitPorts-1:0][CVA6Cfg.XLEN-1:0] wdata_commit_id;
-  logic [CVA6Cfg.NrCommitPorts-1:0] we_gpr_commit_id;
+  logic [CVA6Cfg.NrCommitPorts+CVA6Cfg.RVZilsd-1:0][4:0] waddr_commit_id;
+  logic [CVA6Cfg.NrCommitPorts+CVA6Cfg.RVZilsd-1:0][CVA6Cfg.XLEN-1:0] wdata_commit_id;
+  logic [CVA6Cfg.NrCommitPorts+CVA6Cfg.RVZilsd-1:0] we_gpr_commit_id;
   logic [CVA6Cfg.NrCommitPorts-1:0] we_fpr_commit_id;
   // --------------
   // CSR <-> *
@@ -1681,7 +1681,7 @@ module cva6
   end
 
   for (genvar i = 0; i < CVA6Cfg.NrCommitPorts; ++i) begin
-    assign wdata_commit_id_padded[i] = {{(64 - CVA6Cfg.XLEN) {1'b0}}, wdata_commit_id};
+    assign wdata_commit_id_padded[i] = {{(64 - CVA6Cfg.XLEN) {1'b0}}, wdata_commit_id[i]};
   end
 
   instr_tracer #(
@@ -1702,9 +1702,9 @@ module cva6
       .fetch_ack(id_stage_i.fetch_entry_ready_o),
       .issue_ack(issue_stage_i.i_scoreboard.issue_ack_i),
       .issue_sbe(issue_stage_i.i_scoreboard.issue_instr_o),
-      .waddr(waddr_commit_id),
+      .waddr(waddr_commit_id[CVA6Cfg.NrCommitPorts-1:0]),
       .wdata(wdata_commit_id_padded),
-      .we_gpr(we_gpr_commit_id),
+      .we_gpr(we_gpr_commit_id[CVA6Cfg.NrCommitPorts-1:0]),
       .we_fpr(we_fpr_commit_id),
       .commit_instr(commit_instr_id_commit),
       .commit_ack(commit_ack),
@@ -1821,7 +1821,7 @@ module cva6
       .commit_ack_i(commit_ack),
       .mem_paddr_i (rvfi_mem_paddr),
       .debug_mode_i(debug_mode),
-      .wdata_i     (wdata_commit_id),
+      .wdata_i     (wdata_commit_id[CVA6Cfg.NrCommitPorts-1:0]),
 
       .csr_i(rvfi_csr),
       .irq_i(irq_i),

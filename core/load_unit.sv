@@ -44,7 +44,7 @@ module load_unit
     // Load transaction ID - ISSUE_STAGE
     output logic [CVA6Cfg.TRANS_ID_BITS-1:0] trans_id_o,
     // Load result - ISSUE_STAGE
-    output logic [CVA6Cfg.XLEN+CVA6Cfg.RVZilsd*32-1:0] result_o,
+    output logic [CVA6Cfg.XLEN+32*CVA6Cfg.RVZilsd-1:0] result_o,
     // Load exception - ISSUE_STAGE
     output exception_t ex_o,
     // Request address translation - MMU

@@ -53,7 +53,7 @@ module load_store_unit
     // Load transaction ID - ISSUE_STAGE
     output logic [CVA6Cfg.TRANS_ID_BITS-1:0] load_trans_id_o,
     // Load result - ISSUE_STAGE
-    output logic [CVA6Cfg.XLEN+CVA6Cfg.RVZilsd*32-1:0] load_result_o,
+    output logic [CVA6Cfg.XLEN+32*CVA6Cfg.RVZilsd-1:0] load_result_o,
     // Load result is valid - ISSUE_STAGE
     output logic load_valid_o,
     // Load exception - ISSUE_STAGE
@@ -224,10 +224,10 @@ module load_store_unit
 
   logic                             ld_valid;
   logic [CVA6Cfg.TRANS_ID_BITS-1:0] ld_trans_id;
-  logic [         CVA6Cfg.XLEN-1:0] ld_result;
+  logic [CVA6Cfg.XLEN+32*CVA6Cfg.RVZilsd-1:0] ld_result;
   logic                             st_valid;
   logic [CVA6Cfg.TRANS_ID_BITS-1:0] st_trans_id;
-  logic [         CVA6Cfg.XLEN-1:0] st_result;
+  logic [CVA6Cfg.XLEN+32*CVA6Cfg.RVZilsd-1:0] st_result;
 
   logic [                     11:0] page_offset;
   logic                             page_offset_matches;

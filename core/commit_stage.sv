@@ -191,7 +191,7 @@ module commit_stage
         end
         if (CVA6Cfg.RVZilsd) begin
           if (commit_instr_i[0].op == ariane_pkg::LD && commit_ack_o[0]) begin
-            wdata_o[CVA6Cfg.NrCommitPorts] = commit_instr_i[0].result[CVA6Cfg.XLEN-1+32*CVA6Cfg.RVZilsd:32*CVA6Cfg.RVZilsd]; 
+            wdata_o[CVA6Cfg.NrCommitPorts] = commit_instr_i[0].result >> CVA6Cfg.XLEN; 
             waddr_o[CVA6Cfg.NrCommitPorts] = {commit_instr_i[0].rd[REG_ADDR_SIZE-1:1],1'b1};
             if (!commit_drop_i[0]) begin
               we_gpr_o[CVA6Cfg.NrCommitPorts] = (1'b1 && |commit_instr_i[0].rd);
@@ -356,9 +356,10 @@ module commit_stage
                 commit_ack_o[1] = 1'b0;
                 wdata_o[2] = '0;
                 waddr_o[2] = '0;
-                we_gpr_o[2:1] = 2'b00;
+                we_gpr_o[1] = 1'b0;
+                we_gpr_o[2] = 1'b0;
               end else begin
-                wdata_o[2] = commit_instr_i[1].result[CVA6Cfg.XLEN-1+32*CVA6Cfg.RVZilsd:32*CVA6Cfg.RVZilsd]; 
+                wdata_o[2] = commit_instr_i[1].result >> CVA6Cfg.XLEN; 
                 waddr_o[2] = {commit_instr_i[1].rd[REG_ADDR_SIZE-1:1],1'b1};
                 if (!commit_drop_i[1]) begin
                   we_gpr_o[2] = (1'b1 && |commit_instr_i[1].rd);

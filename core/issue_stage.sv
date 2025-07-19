@@ -143,11 +143,11 @@ module issue_stage
     // CVXIF destination register - EX_STAGE
     input logic [4:0] x_rd_i,
     // Destination register in register file - COMMIT_STAGE
-    input logic [CVA6Cfg.NrCommitPorts-1:0][4:0] waddr_i,
+    input logic [CVA6Cfg.NrCommitPorts+CVA6Cfg.RVZilsd-1:0][4:0] waddr_i,
     // Value to write to register file - COMMIT_STAGE
-    input logic [CVA6Cfg.NrCommitPorts-1:0][CVA6Cfg.XLEN-1:0] wdata_i,
+    input logic [CVA6Cfg.NrCommitPorts+CVA6Cfg.RVZilsd-1:0][CVA6Cfg.XLEN-1:0] wdata_i,
     // GPR write enable - COMMIT_STAGE
-    input logic [CVA6Cfg.NrCommitPorts-1:0] we_gpr_i,
+    input logic [CVA6Cfg.NrCommitPorts+CVA6Cfg.RVZilsd-1:0] we_gpr_i,
     // FPR write enable - COMMIT_STAGE
     input logic [CVA6Cfg.NrCommitPorts-1:0] we_fpr_i,
     // Instructions to commit - COMMIT_STAGE
