@@ -348,10 +348,9 @@ module id_stage #(
     );
   end
 
-if (CVA6Cfg.NrIssuePorts == 2 && CVA6Cfg.FusionEn) begin
+if (CVA6Cfg.SuperscalarEn && CVA6Cfg.FusionEn) begin
     fusion_scan #(
         .CVA6Cfg(CVA6Cfg),
-        .branchpredict_sbe_t(branchpredict_sbe_t),
         .exception_t(exception_t),
         .scoreboard_entry_t(scoreboard_entry_t)
     ) fusion_scan_i (
