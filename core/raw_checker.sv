@@ -72,6 +72,6 @@ module raw_checker
   assign is_zilsd_raw = (rd_zilsd_i[idx_o] && (rs_i == {rd_i[idx_o][REG_ADDR_SIZE-1:1],1'b1}) && !rs_fpr_i);
 
   assign rs_is_gpr0 = (rs_i == '0) && !rs_fpr_i;
-  assign valid_o = |same_rd_as_rs && !rs_is_gpr0;
+  assign valid_o = |same_rd_as_rs && !rs_is_gpr0 && !(is_zilsd_raw && rs_i == {{(REG_ADDR_SIZE-1){1'b0}},1'b1});
 
 endmodule

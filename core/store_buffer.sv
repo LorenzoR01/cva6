@@ -44,6 +44,7 @@ module store_buffer
     output logic [CVA6Cfg.PLEN-1:0] rvfi_mem_paddr_o,
     input logic [CVA6Cfg.XLEN+32*CVA6Cfg.RVZilsd-1:0] data_i,  // data which is placed in the queue
     input logic [((CVA6Cfg.XLEN+32*CVA6Cfg.RVZilsd)/8)-1:0] be_i,  // byte enable in
+    input logic is_zilsd_misaligned_i,
     input logic [1:0] data_size_i,  // type of request we are making (e.g.: bytes to write)
 
     // D$ interface
@@ -59,12 +60,15 @@ module store_buffer
     logic [CVA6Cfg.XLEN+32*CVA6Cfg.RVZilsd-1:0] data;
     logic [(CVA6Cfg.XLEN+32*CVA6Cfg.RVZilsd/8)-1:0] be;
     logic [1:0] data_size;
+    logic is_zilsd_misaligned;
     logic valid;  // this entry is valid, we need this for checking if the address offset matches
   }
       speculative_queue_n[DEPTH_SPEC-1:0],
       speculative_queue_q[DEPTH_SPEC-1:0],
       commit_queue_n[DEPTH_COMMIT-1:0],
       commit_queue_q[DEPTH_COMMIT-1:0];
+
+  logic zilsd_commit_n, zilsd_commit_q, zilsd_commit;
 
   // keep a status count for both buffers
   logic [$clog2(DEPTH_SPEC):0] speculative_status_cnt_n, speculative_status_cnt_q;
@@ -77,6 +81,8 @@ module store_buffer
   logic [$clog2(DEPTH_COMMIT)-1:0] commit_write_pointer_n, commit_write_pointer_q;
 
   assign store_buffer_empty_o = (speculative_status_cnt_q == 0) & no_st_pending_o;
+
+  assign zilsd_commit = zilsd_commit_q && (commit_status_cnt_q < DEPTH_COMMIT);
   // ----------------------------------------
   // Speculative Queue - Core Interface
   // ----------------------------------------
@@ -88,6 +94,10 @@ module store_buffer
     speculative_read_pointer_n  = speculative_read_pointer_q;
     speculative_write_pointer_n = speculative_write_pointer_q;
     speculative_queue_n         = speculative_queue_q;
+    if (commit_i && speculative_queue_n[speculative_read_pointer_q].is_zilsd_misaligned)
+      zilsd_commit_n = 1'b1;
+    else
+      zilsd_commit_n = zilsd_commit_q && (commit_status_cnt_q == DEPTH_COMMIT);
     // LSU interface
     // we are ready to accept a new entry and the input data is valid
     if (valid_i) begin
@@ -95,6 +105,7 @@ module store_buffer
       speculative_queue_n[speculative_write_pointer_q].data = data_i;
       speculative_queue_n[speculative_write_pointer_q].be = be_i;
       speculative_queue_n[speculative_write_pointer_q].data_size = data_size_i;
+      speculative_queue_n[speculative_write_pointer_q].is_zilsd_misaligned = is_zilsd_misaligned_i;
       speculative_queue_n[speculative_write_pointer_q].valid = 1'b1;
       // advance the write pointer
       speculative_write_pointer_n = speculative_write_pointer_q + 1'b1;
@@ -103,7 +114,7 @@ module store_buffer
 
     // evict the current entry out of this queue, the commit queue will thankfully take it and commit it
     // to the memory hierarchy
-    if (commit_i) begin
+    if (commit_i || zilsd_commit) begin
       // invalidate
       speculative_queue_n[speculative_read_pointer_q].valid = 1'b0;
       // advance the read pointer
@@ -124,7 +135,7 @@ module store_buffer
     end
 
     // we are ready if the speculative and the commit queue have a space left
-    ready_o = (speculative_status_cnt_n < (DEPTH_SPEC)) || commit_i;
+    ready_o = (speculative_status_cnt_n < (DEPTH_SPEC)) || commit_i || zilsd_commit;
   end
 
   // ----------------------------------------
@@ -156,7 +167,7 @@ module store_buffer
     automatic logic [$clog2(DEPTH_COMMIT):0] commit_status_cnt;
     commit_status_cnt      = commit_status_cnt_q;
 
-    commit_ready_o         = (commit_status_cnt_q < DEPTH_COMMIT);
+    commit_ready_o         = (commit_status_cnt_q < DEPTH_COMMIT) && !zilsd_commit;
     // no store is pending if we don't have any element in the commit queue e.g.: it is empty
     no_st_pending_o        = (commit_status_cnt_q == 0);
     // default assignments
@@ -183,7 +194,7 @@ module store_buffer
     // happened if we got a grant
 
     // shift the store request from the speculative buffer to the non-speculative
-    if (commit_i) begin
+    if (commit_i || zilsd_commit) begin
       commit_queue_n[commit_write_pointer_q] = speculative_queue_q[speculative_read_pointer_q];
       commit_write_pointer_n = commit_write_pointer_n + 1'b1;
       commit_status_cnt++;
@@ -255,11 +266,13 @@ module store_buffer
       commit_read_pointer_q  <= '0;
       commit_write_pointer_q <= '0;
       commit_status_cnt_q    <= '0;
+      zilsd_commit_q         <= '0;
     end else begin
       commit_queue_q         <= commit_queue_n;
       commit_read_pointer_q  <= commit_read_pointer_n;
       commit_write_pointer_q <= commit_write_pointer_n;
       commit_status_cnt_q    <= commit_status_cnt_n;
+      zilsd_commit_q         <= zilsd_commit_n;
     end
   end
 
@@ -271,7 +284,7 @@ module store_buffer
   // assert that commit is never set when we are flushing this would be counter intuitive
   // as flush and commit is decided in the same stage
   commit_and_flush :
-  assert property (@(posedge clk_i) rst_ni && flush_i |-> !commit_i)
+  assert property (@(posedge clk_i) rst_ni && flush_i |-> !(commit_i || zilsd_commit))
   else $error("[Commit Queue] You are trying to commit and flush in the same cycle");
 
   speculative_buffer_overflow :
@@ -280,11 +293,11 @@ module store_buffer
     $error("[Speculative Queue] You are trying to push new data although the buffer is not ready");
 
   speculative_buffer_underflow :
-  assert property (@(posedge clk_i) rst_ni && (speculative_status_cnt_q == 0) |-> !commit_i)
+  assert property (@(posedge clk_i) rst_ni && (speculative_status_cnt_q == 0) |-> !(commit_i || zilsd_commit))
   else $error("[Speculative Queue] You are committing although there are no stores to commit");
 
   commit_buffer_overflow :
-  assert property (@(posedge clk_i) rst_ni && (commit_status_cnt_q == DEPTH_COMMIT) |-> !commit_i)
+  assert property (@(posedge clk_i) rst_ni && (commit_status_cnt_q == DEPTH_COMMIT) |-> !(commit_i || zilsd_commit))
   else $error("[Commit Queue] You are trying to commit a store although the buffer is full");
   //pragma translate_on
 endmodule

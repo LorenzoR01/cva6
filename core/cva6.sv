@@ -164,6 +164,7 @@ module cva6
       fu_t                              fu;
       fu_op                             operation;
       logic [CVA6Cfg.TRANS_ID_BITS-1:0] trans_id;
+      logic                             is_zilsd_misaligned;
     },
 
     localparam type fu_data_t = struct packed {

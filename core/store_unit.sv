@@ -135,7 +135,7 @@ module store_unit
   logic [((CVA6Cfg.XLEN+32*CVA6Cfg.RVZilsd)/8)-1:0] st_be_n, st_be_q;
   logic [1:0] st_data_size_n, st_data_size_q;
   amo_t amo_op_d, amo_op_q;
-
+  logic is_zilsd_misaligned_n, is_zilsd_misaligned_q;
   logic [CVA6Cfg.TRANS_ID_BITS-1:0] trans_id_n, trans_id_q;
 
   // output assignments
@@ -177,7 +177,7 @@ module store_unit
       end
 
       VALID_STORE: begin
-        valid_o = 1'b1;
+        valid_o = !(is_zilsd_misaligned_q && valid_i);
         // post this store to the store buffer if we are not flushing
         if (!flush_i) st_valid = 1'b1;
 
@@ -254,6 +254,7 @@ module store_unit
     st_data_n = (CVA6Cfg.RVA && instr_is_amo) ? lsu_ctrl_i.data[CVA6Cfg.XLEN+32*CVA6Cfg.RVZilsd-1:0] :
         data_align(lsu_ctrl_i.vaddr[2:0], {{64 - (CVA6Cfg.XLEN+32*CVA6Cfg.RVZilsd){1'b0}}, lsu_ctrl_i.data});
     st_data_size_n = extract_transfer_size(lsu_ctrl_i.operation);
+    is_zilsd_misaligned_n = lsu_ctrl_i.is_zilsd_misaligned;
     // save AMO op for next cycle
     if (CVA6Cfg.RVA) begin
       case (lsu_ctrl_i.operation)
@@ -313,6 +314,7 @@ module store_unit
       .paddr_i,
       .rvfi_mem_paddr_o     (rvfi_mem_paddr_o),
       .data_i               (st_data_q),
+      .is_zilsd_misaligned_i(is_zilsd_misaligned_q),
       .be_i                 (st_be_q),
       .data_size_i          (st_data_size_q),
       .req_port_i           (req_port_i),
@@ -352,6 +354,7 @@ module store_unit
       st_data_q      <= '0;
       st_data_size_q <= '0;
       trans_id_q     <= '0;
+      is_zilsd_misaligned_q <= '0;
       amo_op_q       <= AMO_NONE;
     end else begin
       state_q        <= state_d;
@@ -359,6 +362,7 @@ module store_unit
       st_data_q      <= st_data_n;
       trans_id_q     <= trans_id_n;
       st_data_size_q <= st_data_size_n;
+      is_zilsd_misaligned_q <= is_zilsd_misaligned_n;
       amo_op_q       <= amo_op_d;
     end
   end
