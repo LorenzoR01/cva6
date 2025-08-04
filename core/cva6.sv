@@ -658,7 +658,7 @@ module cva6
   logic [CVA6Cfg.PLEN-1:0] rvfi_mem_paddr;
   logic [CVA6Cfg.NrIssuePorts-1:0] rvfi_is_compressed;
   rvfi_probes_csr_t rvfi_csr;
-
+  logic zilsd_misaligned;
   // Accelerator port
   logic [63:0] inval_addr;
   logic inval_valid;
@@ -1071,7 +1071,8 @@ module cva6
       .pmpaddr_i               (pmpaddr),
       //RVFI
       .rvfi_lsu_ctrl_o         (rvfi_lsu_ctrl),
-      .rvfi_mem_paddr_o        (rvfi_mem_paddr)
+      .rvfi_mem_paddr_o        (rvfi_mem_paddr),
+      .zilsd_misaligned_o      (zilsd_misaligned)
   );
 
   // ---------
@@ -1254,7 +1255,8 @@ module cva6
         .miss_vld_bits_i    (miss_vld_bits),
         .i_tlb_flush_i      (flush_tlb_ctrl_ex),
         .stall_issue_i      (stall_issue),
-        .mcountinhibit_i    (mcountinhibit_csr_perf)
+        .mcountinhibit_i    (mcountinhibit_csr_perf),
+        .zilsd_misaligned_i (zilsd_misaligned)
     );
   end : gen_perf_counter
   else begin : gen_no_perf_counter

@@ -172,7 +172,7 @@ module issue_stage
   // ---------------------------------------------------
   // Scoreboard (SB) <-> Issue and Read Operands (IRO)
   // ---------------------------------------------------
-  typedef logic [(CVA6Cfg.NrRgprPorts == 3 ? CVA6Cfg.XLEN : CVA6Cfg.FLen)-1:0] rs3_len_t;
+  typedef logic [((CVA6Cfg.NrRgprPorts == 3 || CVA6Cfg.NrRgprPorts == 6) ? CVA6Cfg.XLEN : CVA6Cfg.FLen)-1:0] rs3_len_t;
   typedef struct packed {
     logic [CVA6Cfg.NR_SB_ENTRIES-1:0] still_issued;
     logic [CVA6Cfg.TRANS_ID_BITS-1:0] issue_pointer;

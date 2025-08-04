@@ -57,7 +57,8 @@ module perf_counters
     input  logic [NumPorts-1:0][CVA6Cfg.DCACHE_SET_ASSOC-1:0]miss_vld_bits_i,  //For Cache eviction (3ports-LOAD,STORE,PTW)
     input logic i_tlb_flush_i,
     input logic stall_issue_i,  //stall-read operands
-    input logic [31:0] mcountinhibit_i
+    input logic [31:0] mcountinhibit_i,
+    input logic zilsd_misaligned_i
 );
 
   typedef logic [11:0] csr_addr_t;
@@ -132,6 +133,7 @@ module perf_counters
         5'b10100: events[i] = |int_event;  //Integer instructions
         5'b10101: events[i] = |fp_event;  //Floating Point Instructions
         5'b10110: events[i] = stall_issue_i;  //Pipeline bubbles
+        5'b10111: events[i] = zilsd_misaligned_i;
         default: events[i] = 0;
       endcase
     end

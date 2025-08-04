@@ -238,6 +238,8 @@ module ex_stage
     output lsu_ctrl_t rvfi_lsu_ctrl_o,
     // Information dedicated to RVFI - RVFI
     output [CVA6Cfg.PLEN-1:0] rvfi_mem_paddr_o,
+
+    output logic zilsd_misaligned_o,
     // Original instruction AES bits
     input logic [5:0] orig_instr_aes_i
 );
@@ -606,7 +608,8 @@ module ex_stage
       .pmpcfg_i,
       .pmpaddr_i,
       .rvfi_lsu_ctrl_o,
-      .rvfi_mem_paddr_o
+      .rvfi_mem_paddr_o,
+      .zilsd_misaligned_o
   );
 
   if (CVA6Cfg.CvxifEn) begin : gen_cvxif

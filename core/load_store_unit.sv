@@ -161,7 +161,9 @@ module load_store_unit
     // RVFI inforamtion - RVFI
     output lsu_ctrl_t                    rvfi_lsu_ctrl_o,
     // RVFI information - RVFI
-    output logic      [CVA6Cfg.PLEN-1:0] rvfi_mem_paddr_o
+    output logic      [CVA6Cfg.PLEN-1:0] rvfi_mem_paddr_o,
+
+    output logic zilsd_misaligned_o
 );
 
   // data is misaligned
@@ -847,6 +849,9 @@ module load_store_unit
     end
   end
 
+  assign zilsd_misaligned = (CVA6Cfg.RVZilsd && vaddr_i[2:0] == 3'b100 && (fu_data_i.operation == ariane_pkg::LD || fu_data_i.operation == ariane_pkg::SD));
+  assign zilsd_misaligned_o = zilsd_misaligned;
+
   if (CVA6Cfg.RVZilsd) begin
     lsu_ctrl_t zilsd_lsu_second_req_d, zilsd_lsu_second_req_q;
     logic [CVA6Cfg.XLEN-1:0] zilsd_temp_ld_res_d, zilsd_temp_ld_res_q;
@@ -858,8 +863,6 @@ module load_store_unit
       WAIT_FIRST_RES,
       WAIT_SECOND_RES
     } state_d, state_q;
-
-    assign zilsd_misaligned = (CVA6Cfg.RVZilsd && vaddr_i[2:0] == 3'b100 && (fu_data_i.operation == ariane_pkg::LD || fu_data_i.operation == ariane_pkg::SD));
 
     always_comb begin : zilsd_control
       lsu_req_i = zilsd_lsu_req;
@@ -890,11 +893,11 @@ module load_store_unit
               lsu_req_i.operation = ariane_pkg::SW;
               lsu_req_i.data = {{CVA6Cfg.XLEN-1{1'b0}}, zilsd_lsu_req.data[CVA6Cfg.XLEN-1:0]};
               zilsd_lsu_second_req_d.operation = ariane_pkg::SW;
-              zilsd_lsu_second_req_d.data = {{CVA6Cfg.XLEN-1{1'b0}}, zilsd_lsu_req.data >> CVA6Cfg.XLEN};
+              zilsd_lsu_second_req_d.data = zilsd_lsu_req.data >> CVA6Cfg.XLEN;  
             end
             lsu_req_i.be = be_gen(lsu_req_i.vaddr[2:0], extract_transfer_size(lsu_req_i.operation));
             zilsd_lsu_second_req_d.be = be_gen(zilsd_lsu_second_req_d.vaddr[2:0], extract_transfer_size(zilsd_lsu_second_req_d.operation));
-            state_d = SECOND_HALF; //si potrebbe aggiungere un altro stato second half a seconda che riceviamo la prima istruzione quando ready e 0 o 1
+            state_d = SECOND_HALF; 
             lsu_ready_o = 1'b0;
           end
         end
@@ -905,7 +908,7 @@ module load_store_unit
             lsu_req_i = zilsd_lsu_second_req_q;
             zilsd_lsu_valid = 1'b1;
             if (zilsd_lsu_second_req_q.operation == ariane_pkg::LW)
-              if (zilsd_ld_valid) begin
+              if (zilsd_ld_valid && zilsd_ld_trans_id == zilsd_lsu_second_req_q.trans_id) begin
                 zilsd_temp_ld_res_d = zilsd_ld_result[CVA6Cfg.XLEN-1:0];
                 zilsd_temp_ld_ex_d = zilsd_ld_ex;
                 ld_valid = 1'b0;
@@ -920,8 +923,8 @@ module load_store_unit
         end
         WAIT_FIRST_RES: begin
           lsu_ready_o = 1'b0;
-          ld_valid = 1'b0;
-          if (zilsd_ld_valid) begin
+          if (zilsd_ld_valid && zilsd_ld_trans_id == zilsd_lsu_second_req_q.trans_id) begin
+            ld_valid = 1'b0;
             state_d = WAIT_SECOND_RES;
             zilsd_temp_ld_res_d = zilsd_ld_result[CVA6Cfg.XLEN-1:0];
             zilsd_temp_ld_ex_d = zilsd_ld_ex;
@@ -929,7 +932,7 @@ module load_store_unit
         end
         WAIT_SECOND_RES: begin
           lsu_ready_o = 1'b0;
-          if (zilsd_ld_valid) begin
+          if (zilsd_ld_valid && zilsd_ld_trans_id == zilsd_lsu_second_req_q.trans_id) begin
             ld_result = {zilsd_ld_result[CVA6Cfg.XLEN-1:0], zilsd_temp_ld_res_q[CVA6Cfg.XLEN-1:0]};
             state_d = IDLE;
             lsu_ready_o = zilsd_lsu_ready;

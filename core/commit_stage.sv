@@ -154,6 +154,12 @@ module commit_stage
     csr_write_fflags_o = 1'b0;
     flush_commit_o = 1'b0;
 
+    if (CVA6Cfg.RVZilsd) begin
+      wdata_o[CVA6Cfg.NrCommitPorts] = '0;
+      we_gpr_o[CVA6Cfg.NrCommitPorts] = 1'b0;
+      waddr_o[CVA6Cfg.NrCommitPorts] = '0;
+    end
+
     // we do not commit the instruction yet if we requested a halt
     if (commit_instr_i[0].valid && !halt_i) begin
       // we will not commit the instruction if we took an exception
@@ -198,10 +204,6 @@ module commit_stage
             end else begin
               we_gpr_o[CVA6Cfg.NrCommitPorts] = 1'b0;
             end
-          end else begin
-            wdata_o[CVA6Cfg.NrCommitPorts] = '0;
-            waddr_o[CVA6Cfg.NrCommitPorts] = '0;
-            we_gpr_o[CVA6Cfg.NrCommitPorts] = 1'b0;
           end
         end
 
@@ -354,10 +356,7 @@ module commit_stage
             if (commit_instr_i[1].op == ariane_pkg::LD && commit_ack_o[1]) begin
               if (commit_instr_i[0].op == ariane_pkg::LD && !commit_drop_i[1]) begin
                 commit_ack_o[1] = 1'b0;
-                wdata_o[2] = '0;
-                waddr_o[2] = '0;
                 we_gpr_o[1] = 1'b0;
-                we_gpr_o[2] = 1'b0;
               end else begin
                 wdata_o[2] = commit_instr_i[1].result >> CVA6Cfg.XLEN; 
                 waddr_o[2] = {commit_instr_i[1].rd[REG_ADDR_SIZE-1:1],1'b1};
@@ -367,10 +366,6 @@ module commit_stage
                   we_gpr_o[2] = 1'b0;
                 end
               end
-            end else begin
-              wdata_o[2] = '0;
-              waddr_o[2] = '0;
-              we_gpr_o[2] = 1'b0;
             end
           end
 
