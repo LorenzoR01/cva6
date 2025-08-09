@@ -171,10 +171,10 @@ module load_store_unit
 
   logic zilsd_misaligned, zilsd_lsu_valid;
   lsu_ctrl_t zilsd_lsu_req, lsu_req_i;
-  logic [CVA6Cfg.TRANS_ID_BITS-1:0] zilsd_ld_trans_id, zilsd_st_trans_id;
-  logic zilsd_lsu_ready, zilsd_ld_valid, zilsd_st_valid;
-  logic [CVA6Cfg.XLEN+32*CVA6Cfg.RVZilsd-1:0] zilsd_ld_result, zilsd_st_result;
-  exception_t zilsd_ld_ex, zilsd_st_ex;
+  logic [CVA6Cfg.TRANS_ID_BITS-1:0] zilsd_ld_trans_id;
+  logic zilsd_lsu_ready, zilsd_ld_valid;
+  logic [CVA6Cfg.XLEN+32*CVA6Cfg.RVZilsd-1:0] zilsd_ld_result;
+  exception_t zilsd_ld_ex;
 
   // --------------------------------------
   // 1st register stage - (stall registers)
@@ -531,10 +531,10 @@ module load_store_unit
       .commit_ready_o,
       .amo_valid_commit_i,
 
-      .valid_o              (zilsd_st_valid),
-      .trans_id_o           (zilsd_st_trans_id),
-      .result_o             (zilsd_st_result),
-      .ex_o                 (zilsd_st_ex),
+      .valid_o              (st_valid),
+      .trans_id_o           (st_trans_id),
+      .result_o             (st_result),
+      .ex_o                 (st_ex),
       // MMU port
       .translation_req_o    (cva6_st_translation_req),
       .vaddr_o              (st_vaddr),
@@ -733,7 +733,7 @@ module load_store_unit
         endcase
       end
       case (lsu_ctrl.operation)
-        // double word zilsd
+        // double word zilsd: raise exeption for LD and SD not aligned to 64bit or 32bit
         LD, SD: begin
           if (CVA6Cfg.RVZilsd) begin 
             if (lsu_ctrl.vaddr[1:0] != 2'b00)
@@ -849,11 +849,13 @@ module load_store_unit
     end
   end
 
+  // Detect 32bit aligned SD and LD for zilsd extension
   assign zilsd_misaligned = (CVA6Cfg.RVZilsd && vaddr_i[2:0] == 3'b100 && (fu_data_i.operation == ariane_pkg::LD || fu_data_i.operation == ariane_pkg::SD));
   assign zilsd_misaligned_o = zilsd_misaligned;
 
   if (CVA6Cfg.RVZilsd) begin
     lsu_ctrl_t zilsd_lsu_second_req_d, zilsd_lsu_second_req_q;
+    logic [CVA6Cfg.TRANS_ID_BITS-1:0] zilsd_first_req_tid_d, zilsd_first_req_tid_q;
     logic [CVA6Cfg.XLEN-1:0] zilsd_temp_ld_res_d, zilsd_temp_ld_res_q;
     exception_t zilsd_temp_ld_ex_d, zilsd_temp_ld_ex_q;
 
@@ -864,30 +866,34 @@ module load_store_unit
       WAIT_SECOND_RES
     } state_d, state_q;
 
+    // FSM to handle 32bit aligned LD and SD for zilsd extension:
+    // splits LD and SD into two LW or SW and then collects the two LW results 
+    // into a single 64bit result to be redirected to the original LD scoreboard entry.
+    // In case of 32bit aligned SD only the first two states are used.
+
     always_comb begin : zilsd_control
       lsu_req_i = zilsd_lsu_req;
       lsu_ready_o = zilsd_lsu_ready;
       ld_trans_id = zilsd_ld_trans_id;
-      st_trans_id = zilsd_st_trans_id;
       ld_valid = zilsd_ld_valid;
-      st_valid = zilsd_st_valid;
       ld_ex = zilsd_ld_ex;
-      st_ex = zilsd_st_ex;
       ld_result = zilsd_ld_result;
-      st_result = zilsd_st_result;
       state_d = state_q;
       zilsd_lsu_valid = 1'b0;
       zilsd_lsu_second_req_d = zilsd_lsu_second_req_q;
       zilsd_temp_ld_res_d = zilsd_temp_ld_res_q;
       zilsd_temp_ld_ex_d = zilsd_temp_ld_ex_q;
+      zilsd_first_req_tid_d = zilsd_first_req_tid_q;
       case (state_q)
         IDLE: begin
           if (zilsd_lsu_req.is_zilsd_misaligned) begin
             zilsd_lsu_second_req_d = zilsd_lsu_req;
             zilsd_lsu_second_req_d.is_zilsd_misaligned = 1'b0;
             zilsd_lsu_second_req_d.vaddr = zilsd_lsu_req.vaddr + 3'b100;
+            zilsd_first_req_tid_d = zilsd_lsu_req.trans_id;
             if (zilsd_lsu_req.operation == ariane_pkg::LD) begin
               lsu_req_i.operation = ariane_pkg::LW;
+              zilsd_lsu_second_req_d.trans_id = zilsd_lsu_req.trans_id + 1'b1;
               zilsd_lsu_second_req_d.operation = ariane_pkg::LW;
             end else begin
               lsu_req_i.operation = ariane_pkg::SW;
@@ -907,15 +913,15 @@ module load_store_unit
           if (zilsd_lsu_ready) begin
             lsu_req_i = zilsd_lsu_second_req_q;
             zilsd_lsu_valid = 1'b1;
-            if (zilsd_lsu_second_req_q.operation == ariane_pkg::LW)
-              if (zilsd_ld_valid && zilsd_ld_trans_id == zilsd_lsu_second_req_q.trans_id) begin
+            if (zilsd_lsu_second_req_q.operation == ariane_pkg::LW) begin
+              if (zilsd_ld_valid && zilsd_ld_trans_id == zilsd_first_req_tid_q) begin
                 zilsd_temp_ld_res_d = zilsd_ld_result[CVA6Cfg.XLEN-1:0];
                 zilsd_temp_ld_ex_d = zilsd_ld_ex;
                 ld_valid = 1'b0;
                 state_d = WAIT_SECOND_RES;
               end else 
                 state_d = WAIT_FIRST_RES;
-            else begin
+            end else begin
               state_d = IDLE;
               lsu_ready_o = zilsd_lsu_ready;
             end
@@ -923,7 +929,7 @@ module load_store_unit
         end
         WAIT_FIRST_RES: begin
           lsu_ready_o = 1'b0;
-          if (zilsd_ld_valid && zilsd_ld_trans_id == zilsd_lsu_second_req_q.trans_id) begin
+          if (zilsd_ld_valid && (zilsd_ld_trans_id == zilsd_first_req_tid_q || zilsd_ld_trans_id == zilsd_lsu_second_req_q.trans_id)) begin
             ld_valid = 1'b0;
             state_d = WAIT_SECOND_RES;
             zilsd_temp_ld_res_d = zilsd_ld_result[CVA6Cfg.XLEN-1:0];
@@ -932,8 +938,13 @@ module load_store_unit
         end
         WAIT_SECOND_RES: begin
           lsu_ready_o = 1'b0;
-          if (zilsd_ld_valid && zilsd_ld_trans_id == zilsd_lsu_second_req_q.trans_id) begin
-            ld_result = {zilsd_ld_result[CVA6Cfg.XLEN-1:0], zilsd_temp_ld_res_q[CVA6Cfg.XLEN-1:0]};
+          if (zilsd_ld_valid && (zilsd_ld_trans_id == zilsd_first_req_tid_q || zilsd_ld_trans_id == zilsd_lsu_second_req_q.trans_id)) begin
+            if (zilsd_ld_trans_id == zilsd_lsu_second_req_q.trans_id) begin
+              ld_result = {zilsd_ld_result[CVA6Cfg.XLEN-1:0], zilsd_temp_ld_res_q};
+            end else begin
+              ld_result = {zilsd_temp_ld_res_q, zilsd_ld_result[CVA6Cfg.XLEN-1:0]};
+            end
+            ld_trans_id = zilsd_first_req_tid_q;
             state_d = IDLE;
             lsu_ready_o = zilsd_lsu_ready;
             ld_ex = zilsd_ld_ex.valid ? zilsd_ld_ex : zilsd_temp_ld_ex_q;
@@ -946,11 +957,13 @@ module load_store_unit
     always_ff @(posedge clk_i or negedge rst_ni) begin
       if (~rst_ni) begin
         state_q <= IDLE;
+        zilsd_first_req_tid_q <= '0;
         zilsd_lsu_second_req_q <= '0;
         zilsd_temp_ld_res_q <= '0;
         zilsd_temp_ld_ex_q <= '0;
       end else begin
         state_q <= state_d;
+        zilsd_first_req_tid_q <= zilsd_first_req_tid_d;
         zilsd_lsu_second_req_q <= zilsd_lsu_second_req_d;
         zilsd_temp_ld_res_q <= zilsd_temp_ld_res_d;
         zilsd_temp_ld_ex_q <= zilsd_temp_ld_ex_d;
@@ -960,13 +973,9 @@ module load_store_unit
     assign lsu_req_i = zilsd_lsu_req;
     assign lsu_ready_o = zilsd_lsu_ready;
     assign ld_trans_id = zilsd_ld_trans_id;
-    assign st_trans_id = zilsd_st_trans_id;
     assign ld_valid = zilsd_ld_valid;
-    assign st_valid = zilsd_st_valid;
     assign ld_result = zilsd_ld_result;
-    assign st_result = zilsd_st_result;
     assign ld_ex = zilsd_ld_ex;
-    assign st_ex = zilsd_st_ex;
   end
 
   // ------------------

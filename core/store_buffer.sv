@@ -94,10 +94,13 @@ module store_buffer
     speculative_read_pointer_n  = speculative_read_pointer_q;
     speculative_write_pointer_n = speculative_write_pointer_q;
     speculative_queue_n         = speculative_queue_q;
+
+    // generate another commit signal to commit the second SW of a zilsd 32bit aligned SD
     if (commit_i && speculative_queue_n[speculative_read_pointer_q].is_zilsd_misaligned)
       zilsd_commit_n = 1'b1;
     else
       zilsd_commit_n = zilsd_commit_q && (commit_status_cnt_q == DEPTH_COMMIT);
+
     // LSU interface
     // we are ready to accept a new entry and the input data is valid
     if (valid_i) begin

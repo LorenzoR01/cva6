@@ -195,6 +195,8 @@ module commit_stage
             commit_ack_o[0] = 1'b0;
           end
         end
+
+        // if a zilsd LD commits on port 0 then rd+1 is updated using port 1 or 2 if superscalar
         if (CVA6Cfg.RVZilsd) begin
           if (commit_instr_i[0].op == ariane_pkg::LD && commit_ack_o[0]) begin
             wdata_o[CVA6Cfg.NrCommitPorts] = commit_instr_i[0].result >> CVA6Cfg.XLEN; 
@@ -336,7 +338,8 @@ module commit_stage
                                 && !(commit_instr_i[0].fu inside {CSR})
                                 && !flush_dcache_i
                                 && !(CVA6Cfg.RVA && instr_0_is_amo)
-                                && !single_step_i) begin
+                                && !single_step_i
+                                && !(CVA6Cfg.RVZilsd && commit_instr_i[0].op == ariane_pkg::LD && commit_instr_i[1].rd == {commit_instr_i[0].rd[REG_ADDR_SIZE-1:1],1'b1})) begin
         // only if the first instruction didn't throw an exception and this instruction won't throw an exception
         // and the functional unit is of type ALU, LOAD, CTRL_FLOW, MULT, FPU or FPU_VEC
         if (!commit_instr_i[1].ex.valid && (commit_instr_i[1].fu inside {ALU, LOAD, CTRL_FLOW, MULT, FPU, FPU_VEC})) begin
@@ -352,6 +355,7 @@ module commit_stage
               we_fpr_o[1] = 1'b1;
             else we_gpr_o[1] = 1'b1;
 
+          // if a zilsd LD commits on port 1 and there isn't another zilsd LD commiting on port 0 then rd+1 is updated using port 2
           if (CVA6Cfg.RVZilsd) begin
             if (commit_instr_i[1].op == ariane_pkg::LD && commit_ack_o[1]) begin
               if (commit_instr_i[0].op == ariane_pkg::LD && !commit_drop_i[1]) begin

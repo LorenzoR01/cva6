@@ -177,6 +177,7 @@ module store_unit
       end
 
       VALID_STORE: begin
+        // don't raise valid for the first LW/SW of a zilsd 32bit aliged LD/SD
         valid_o = !(is_zilsd_misaligned_q && valid_i);
         // post this store to the store buffer if we are not flushing
         if (!flush_i) st_valid = 1'b1;

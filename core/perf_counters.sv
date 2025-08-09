@@ -133,7 +133,9 @@ module perf_counters
         5'b10100: events[i] = |int_event;  //Integer instructions
         5'b10101: events[i] = |fp_event;  //Floating Point Instructions
         5'b10110: events[i] = stall_issue_i;  //Pipeline bubbles
-        5'b10111: events[i] = zilsd_misaligned_i;
+        5'b10111: events[i] = zilsd_misaligned_i; //32bit aligned load or store double
+        5'b11000: events[i] = (|store_event) && (commit_instr_i[0].op == SD); //Store double event
+        5'b11001: events[i] = (|load_event) && (commit_instr_i[0].op == LD); //Load double event
         default: events[i] = 0;
       endcase
     end

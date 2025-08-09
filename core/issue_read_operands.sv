@@ -439,7 +439,7 @@ module issue_read_operands
   for (genvar i = 0; i < CVA6Cfg.NR_SB_ENTRIES; i++) begin
     assign rd_list[i] = fwd_i.sbe[i].rd;
     assign rd_fpr[i]  = CVA6Cfg.FpPresent && ariane_pkg::is_rd_fpr(fwd_i.sbe[i].op);
-    assign rd_zilsd[i] = CVA6Cfg.RVZilsd && (fwd_i.sbe[i].op == ariane_pkg::LD);
+    assign rd_zilsd[i] = CVA6Cfg.RVZilsd && (fwd_i.sbe[i].op == ariane_pkg::LD); // rds that can cause a zilsd raw
   end
 
   for (genvar i = 0; i < CVA6Cfg.NrIssuePorts; i++) begin : gen_raw_checks
@@ -514,6 +514,7 @@ module issue_read_operands
     end
   end
 
+  // for raws caused by zilsd rds the upper 32bit of the result are forwarded, which represent the result to be stored in rd+1
   for (genvar i = 0; i < CVA6Cfg.NrIssuePorts; i++) begin
     assign rs1_res[i] = rs1_zilsd_raw[i] ? fwd_res[idx_hzd_rs1[i]] >> CVA6Cfg.XLEN : fwd_res[idx_hzd_rs1[i]][CVA6Cfg.XLEN-1:0];
     assign rs1_is_not_csr[i] = rs1_fpr[i] || (fwd_i.sbe[idx_hzd_rs1[i]].fu != ariane_pkg::CSR) || (CVA6Cfg.RVS && issue_instr_i[i].op == ariane_pkg::SFENCE_VMA);
@@ -652,6 +653,7 @@ module issue_read_operands
         fu_data_n[i].imm = (CVA6Cfg.FpPresent && is_imm_fpr(issue_instr_i[i].op)) ?
             {{CVA6Cfg.XLEN - CVA6Cfg.FLen{1'b0}}, operand_c_regfile[i]} : issue_instr_i[i].result[CVA6Cfg.XLEN-1:0];
       end
+      // for zilsd SD an operand_c field is needed to store the third operand since the imm field is already used for the immediate 
       if (CVA6Cfg.RVZilsd && issue_instr_i[i].op == ariane_pkg::SD) begin
         fu_data_n[i].operand_c = operand_c_regfile[i];
         fu_data_n[i].imm = issue_instr_i[i].result >> CVA6Cfg.XLEN;
