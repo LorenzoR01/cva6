@@ -1786,6 +1786,10 @@ module cva6
   for (genvar i = 0; i < CVA6Cfg.NrIssuePorts; i++) begin
     assign rvfi_fetch_instr[i] = fetch_entry_if_id[i].instruction;
   end
+  logic [CVA6Cfg.NrWbPorts-1:0][CVA6Cfg.XLEN-1:0] rvfi_wbdata_ex_id;
+  for (genvar i = 0; i < CVA6Cfg.NrWbPorts; i++) begin
+    assign rvfi_wbdata_ex_id[i] = wbdata_ex_id[i];
+  end
 
   cva6_rvfi_probes #(
       .CVA6Cfg            (CVA6Cfg),
@@ -1820,7 +1824,7 @@ module cva6
       .priv_lvl_i    (priv_lvl),
 
       .lsu_ctrl_i  (rvfi_lsu_ctrl),
-      .wbdata_i    (wbdata_ex_id),
+      .wbdata_i    (rvfi_wbdata_ex_id),
       .commit_ack_i(commit_ack),
       .mem_paddr_i (rvfi_mem_paddr),
       .debug_mode_i(debug_mode),

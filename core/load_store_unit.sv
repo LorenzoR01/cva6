@@ -946,7 +946,7 @@ module load_store_unit
             end
             ld_trans_id = zilsd_first_req_tid_q;
             state_d = IDLE;
-            lsu_ready_o = zilsd_lsu_ready;
+            //lsu_ready_o = zilsd_lsu_ready;
             ld_ex = zilsd_ld_ex.valid ? zilsd_ld_ex : zilsd_temp_ld_ex_q;
           end
         end
